@@ -6,7 +6,7 @@ import nibabel as nib
 # (nibabel will do this for you for the Nifti)
 # (b-values and b-vectors are text files)
 
-dmri = nib.load("dmri.nii")
+dmri = nib.load("dmri.nii",mmap=False)
 
 dmri_data =dmri.get_data()
 
@@ -26,9 +26,8 @@ B[:,5]=b_vectors[:,2    ]*b_vectors[:,2]
 
 
 
+ensemble_D=X = np.empty(shape=[dmri_data.shape[0], dmri_data.shape[1],dmri_data.shape[2],1,6])
 
-
-ensemble_D=np.zeros((dmri_data.shape[0],dmri_data.shape[1],dmri_data.shape[2]))
 
 for x in range (dmri_data.shape[0]) :
     print(x)
@@ -41,10 +40,16 @@ for x in range (dmri_data.shape[0]) :
             X=-X/b_value
             
             D=np.linalg.inv(np.dot(B.T,B)).dot(B.T).dot(X)
-            ensemble_D[x,y,z]=D
+            ensemble_D[x,y,z,0]=D
 
-
-
+img = nib.Nifti1Image(ensemble_D, np.eye(4))
+img.set_data_dtype(np.float32)
+header_info = img.header
+header_info['pixdim'][1:5]  = dmri.header['pixdim'][1:5]
+x = nib.Nifti1Image(ensemble_D, np.eye(4), header_info)
+print(dmri.header.get_zooms())
+print(x.header.get_zooms())
+nib.save(img, filename="tensors.nii")
 #
 # Compute tensors and FA/ADC
 #  - tensor fit
