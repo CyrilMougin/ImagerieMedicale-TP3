@@ -6,6 +6,7 @@ import nibabel as nib
 # (nibabel will do this for you for the Nifti)
 # (b-values and b-vectors are text files)
 
+
 dmri = nib.load("dmri.nii")
 
 dmri_data =dmri.get_data()
@@ -42,6 +43,7 @@ for x in range (dmri_data.shape[0]) :
             
             D=np.linalg.inv(np.dot(B.T,B)).dot(B.T).dot(X)
             ensemble_D[x,y,z]=D
+
 
 
 
