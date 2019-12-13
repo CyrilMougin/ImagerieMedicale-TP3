@@ -93,3 +93,11 @@ FiberNavigator-Release/GLSL/anatomy.vs
 FiberNavigator-Release/GLSL/anatomy.fs
 FiberNavigator-Release/glew32.dll
 FiberNavigator-Release/fibernavigator.exe
+Data/dmri.nii.gz
+Data/dmri.nii/dmri.nii
+Data/fmri.nii.gz
+Data/fmri.nii/fmri.nii
+Data/t1.nii/t1.nii
+Data/ideal.txt
+Data/t1.nii.gz
+Data/gradient_directions_b-values.txt
