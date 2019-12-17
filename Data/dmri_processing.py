@@ -6,7 +6,8 @@ import dipy.data as dpd
 import dipy.reconst.dti as dti
 import matplotlib.pyplot as plt
 import math
-
+from scipy.interpolate import RegularGridInterpolator
+from sklearn.metrics.pairwise import cosine_similarity
 #
 # LOAD DATA and b-values, b-vectors
 # (nibabel will do this for you for the Nifti)
@@ -129,6 +130,124 @@ enregistrer_cartes(fa, adc)
 #  - tensor fit
 #  - SVD  -> eigen values -> FA/AD
 #
+# =============================================================================
+# tractographie
+# =============================================================================
+fa_threshold=0.30
+streamlines=nib.streamlines.array_sequence.ArraySequence()
+
+
+#choix mask
+mask=np.zeros(shape=[dmri_data.shape[0], dmri_data.shape[1],dmri_data.shape[2]])
+for x in range (dmri_data.shape[0]) :
+    for y in range (dmri_data.shape[1]) :
+        for z in range(dmri_data.shape[2]) :
+            if (fa[x,y,z]>fa_threshold) :
+                mask[x,y,z]=255
+                
+plt.imshow(fa[:,:,30], cmap="gray")
+plt.figure()
+plt.imshow(mask[:,:,30], cmap="gray")
+plt.figure()
+plt.imshow(fa[:,63,:], cmap="gray")
+plt.figure()
+plt.imshow(mask[:,63,:], cmap="gray")
+plt.figure()
+plt.imshow(fa[63,:,:], cmap="gray")
+plt.figure()
+plt.imshow(mask[63,:,:], cmap="gray")
+
+#generation des seeds
+
+seeds=np.empty(shape=(100,3))
+cmpt=0
+while (cmpt<100):
+    random_index_x = np.random.randint(0, dmri_data.shape[0])
+    random_index_y = np.random.randint(0, dmri_data.shape[1])
+    random_index_z = np.random.randint(0, dmri_data.shape[2])
+    if(mask[random_index_x,random_index_y, random_index_z]==255) :#position valide dans le mask    
+        seeds[cmpt]=[random_index_x,random_index_y, random_index_z]
+        cmpt+=1
+
+#tracking
+delta_step=0.5   
+seed=seeds[1]     
+
+def get_closest_dir(evec, direction) :
+    sim=[]
+    for i in range (3):
+        tmp=cosine_similarity(direction.reshape(1, -1),evec[:,i].reshape(1, -1)).squeeze()
+        sim.append(tmp)
+        
+    sim=np.array(sim)
+    
+    angle=np.amax(sim)
+    if (np.amax(sim)>1) :
+        angle=1
+    return evec[:,np.argmax(sim)], angle
+
+def interpolation (dir_prec, coord):
+    voisins=np.empty(shape=(8,3))
+    angle=np.empty(shape=(8,1))
+    floor=np.int32(np.floor(coord))
+    ceil=np.int32(np.ceil(coord))
+    voisins[0], angle[0]=get_closest_dir(evecs[ceil[0],ceil[1],ceil[2]],dir_prec)
+    voisins[1], angle[1]=get_closest_dir(evecs[floor[0],ceil[1],ceil[2]],dir_prec)
+    voisins[2], angle[2]=get_closest_dir(evecs[floor[0],floor[1],ceil[2]],dir_prec)
+    voisins[3], angle[3]=get_closest_dir(evecs[floor[0],floor[1],floor[2]],dir_prec)
+    voisins[4], angle[4]=get_closest_dir(evecs[ceil[0],floor[1],ceil[2]],dir_prec)
+    voisins[5] , angle[5]=get_closest_dir(evecs[ceil[0],floor[1],floor[2]],dir_prec)
+    voisins[6] , angle[6]=get_closest_dir(evecs[ceil[0],ceil[1],floor[2]],dir_prec)
+    voisins[7] , angle[7]=get_closest_dir(evecs[floor[0],ceil[1],floor[2]],dir_prec)
+    
+    retour=np.mean(voisins, axis=0)
+    print(retour)
+    tmp=cosine_similarity(dir_prec.reshape(1, -1),retour.reshape(1, -1)).squeeze()
+    if (tmp>1):
+        tmp=1
+    angle=np.rad2deg(np.arccos(tmp))
+    print(angle)
+    return retour, angle
+
+
+l=seed
+l=np.vstack([l, seed])
+l=np.int32(l)
+dir_prec=evecs[l[1][0],l[1][1],l[1][2]][:,0]
+angle=0
+   
+
+conditions=l[-1][0]<dmri_data.shape[0] and l[-1][1]<dmri_data.shape[1] and l[-1][2]<dmri_data.shape[2]
+#conditions=conditions and mask[l[-1][0],l[-1][1], l[-1][2]]==255
+conditions= conditions and angle<45
+
+while (conditions):
+    x=np.int32(l[-1][0])
+    y=np.int32(l[-1][1])
+    z=np.int32(l[-1][2])
+    directions=evecs[x,y,z]
+    
+   
+    
+    direction_princ, angle= interpolation(dir_prec, l[-1])
+    p=l[-1]+ direction_princ*delta_step
+    
+    dir_prec=direction_princ
+    
+    l=np.vstack([l, p])
+    
+#    print(angle)
+#    print(l[-1])
+#    print(mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])])
+    conditions=l[-1][0]<dmri_data.shape[0] and l[-1][1]<dmri_data.shape[1] and l[-1][2]<dmri_data.shape[2]
+    #conditions=conditions and mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])]==255
+    conditions= conditions and angle<45
+
+#plt.imshow(mask[70:90,60:90,39],cmap="gray")
+
+#for seed in seeds :
+    
+    
 
 #
 # Tracking deterministe sur la direction principale -> eigen vector1
