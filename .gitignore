@@ -98,3 +98,6 @@ Data/Thumbs.db
 Data/tensor.png
 Data/ideal.txt
 Data/gradient_directions_b-values.txt
+Data/dmri.nii.gz
+Data/fmri.nii.gz
+Data/t1.nii.gz
