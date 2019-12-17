@@ -103,7 +103,7 @@ for x in range (dmri_data.shape[0]) :
                     fa[x,y,z]=np.sqrt(1/2)*np.sqrt(np.power(s[0]-s[1],2)+np.power(s[1]-s[2],2)+np.power(s[2]-s[0],2))/np.sqrt(s[0]*s[0]+s[1]*s[1]+s[2]*s[2])
                     adc[x,y,z]=(s[0]+s[1]+s[2])/3
                 
-
+print(ensemble_D[30:30])
 def afficher_tenseurs(fa_,evec,eva) :
     cfa = dti.color_fa(fa_, evec)
     sphere = dpd.default_sphere
@@ -170,8 +170,7 @@ while (cmpt<100):
         cmpt+=1
 
 #tracking
-delta_step=0.5   
-seed=seeds[1]     
+delta_step=0.5       
 
 def get_closest_dir(evec, direction) :
     sim=[]
@@ -201,51 +200,59 @@ def interpolation (dir_prec, coord):
     voisins[7] , angle[7]=get_closest_dir(evecs[floor[0],ceil[1],floor[2]],dir_prec)
     
     retour=np.mean(voisins, axis=0)
-    print(retour)
+
     tmp=cosine_similarity(dir_prec.reshape(1, -1),retour.reshape(1, -1)).squeeze()
     if (tmp>1):
         tmp=1
     angle=np.rad2deg(np.arccos(tmp))
-    print(angle)
+
     return retour, angle
 
 
-l=seed
-l=np.vstack([l, seed])
-l=np.int32(l)
-dir_prec=evecs[l[1][0],l[1][1],l[1][2]][:,0]
-angle=0
-   
+streamlines = nib.streamlines.array_sequence.ArraySequence()
+for i in range (100) :
+    print(i)
+    l=seeds[i]
+    l=np.vstack([l, seeds[i]])
+    l=np.int32(l)
+    dir_prec=evecs[l[1][0],l[1][1],l[1][2]][:,0]
+    angle=0
+       
+    
+    conditions=l[-1][0]<dmri_data.shape[0]-1 and l[-1][1]<dmri_data.shape[1]-1 and l[-1][2]<dmri_data.shape[2]-1
+    #conditions=conditions and mask[l[-1][0],l[-1][1], l[-1][2]]==255
+    conditions= conditions and angle<30
+    
+    while (conditions):
+        x=np.int32(l[-1][0])
+        y=np.int32(l[-1][1])
+        z=np.int32(l[-1][2])
+        directions=evecs[x,y,z]
+        
+       
+        
+        direction_princ, angle= interpolation(dir_prec, l[-1])
+        p=l[-1]+ direction_princ*delta_step
+        
+        dir_prec=direction_princ
+        
+        l=np.vstack([l, p])
+        
+    #    print(angle)
+    #    print(l[-1])
+    #    print(mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])])
+        conditions=l[-1][0]<dmri_data.shape[0]-1 and l[-1][1]<dmri_data.shape[1]-1 and l[-1][2]<dmri_data.shape[2]-1
+        #conditions=conditions and mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])]==255
+        conditions= conditions and angle<30
+        
+    streamlines.append(l)
 
-conditions=l[-1][0]<dmri_data.shape[0] and l[-1][1]<dmri_data.shape[1] and l[-1][2]<dmri_data.shape[2]
-#conditions=conditions and mask[l[-1][0],l[-1][1], l[-1][2]]==255
-conditions= conditions and angle<45
 
-while (conditions):
-    x=np.int32(l[-1][0])
-    y=np.int32(l[-1][1])
-    z=np.int32(l[-1][2])
-    directions=evecs[x,y,z]
-    
-   
-    
-    direction_princ, angle= interpolation(dir_prec, l[-1])
-    p=l[-1]+ direction_princ*delta_step
-    
-    dir_prec=direction_princ
-    
-    l=np.vstack([l, p])
-    
-#    print(angle)
-#    print(l[-1])
-#    print(mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])])
-    conditions=l[-1][0]<dmri_data.shape[0] and l[-1][1]<dmri_data.shape[1] and l[-1][2]<dmri_data.shape[2]
-    #conditions=conditions and mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])]==255
-    conditions= conditions and angle<45
+print(streamlines)
+tractogramme=nib.streamlines.tractogram.Tractogram(streamlines, affine_to_rasmm=np.identity(4))
+file=nib.streamlines.trk.TrkFile(tractogramme)
+file.save("fibre.trk")
 
-#plt.imshow(mask[70:90,60:90,39],cmap="gray")
-
-#for seed in seeds :
     
     
 
