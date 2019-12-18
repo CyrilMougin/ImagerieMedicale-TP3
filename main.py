@@ -56,29 +56,6 @@ img=nib.load('Data/fmri.nii/fmri.nii')
 img_data = img.get_data()
 img_header = img.header
 
-def fft_voxel(img,x,y,z,plot=False):
-    img_data = img.get_data()
-    img_header = img.header
-    voxel=img_data[x][y][z][:]
-    #f = np.fft.fft(voxel)
-    if plot :
-        t = np.arange(85)
-        # affichage du signal
-        plt.subplot(211)
-        plt.plot(t,voxel)
-        
-        # calcul de A
-        A = np.fft.fft(voxel)
-        # visualisation de A
-        plt.subplot(212)
-        plt.plot(np.real(A))
-        plt.ylabel("partie reelle")
-        
-        plt.show()
-    return
-
-#fft_voxel(img,40,40,30,True)
-
 def eliminate_non_brain(img_data):
     for t in range(0,85):
         for i in range(len(img_data[0][0])):
@@ -88,21 +65,8 @@ def eliminate_non_brain(img_data):
             img_data[:, :, i,t][indexes]=0
     return img_data
 
-# Plot difference before and after
-# =============================================================================
-# img_data = load('Data/fmri.nii/fmri.nii')
-# np_imgs =view4D(img_data,'transversal', False,10)
-# np_img = np_imgs[0]
-# plot_slice(1,np_img,"Image source")
-# 
-# img_data = eliminate_non_brain(img_data)
-# np_imgs = view4D(img_data,'transversal', False,10)
-# np_img = np_imgs[0]
-# plot_slice(2,np_img,"Image après élimination")
-# =============================================================================
 
-print(img_header)
-
+img_data = eliminate_non_brain(img_data)
 acq_num=85
 
 # Select a random voxel by getting one random x- and y-coorinate
@@ -121,7 +85,7 @@ ax.tick_params(labelsize=12)
 plt.show()
 
 # Average all volumes
-mean_data = img_data.mean(axis=2)
+mean_data = img_data.mean(axis=3)
 
 # Create the design matrix
 constant = np.ones(acq_num)
@@ -130,26 +94,6 @@ with open("Data/ideal.txt") as f:
 predicted_response= [float(x.strip()) for x in content] 
 
 design_matrix = np.array((constant, predicted_response))
-
-# Create the plots
-fig, ax = plt.subplots(2,1, figsize=(15, 5))
-ax[0].plot(design_matrix[0], lw=3)
-ax[0].set_xlim(0, acq_num-1)
-ax[0].set_ylim(0, 1.5)
-ax[0].set_title('constant', fontsize=25)
-ax[0].set_xticks([])
-ax[0].set_yticks([0,1])
-ax[0].tick_params(labelsize=12)
-ax[0].tick_params(labelsize=12)
-
-ax[1].plot(design_matrix[1], lw=3)
-ax[1].set_xlim(0, acq_num-1)
-ax[1].set_ylim(0, 1.5)
-ax[1].set_title('expected response', fontsize=25)
-ax[1].set_yticks([0,1])
-ax[1].set_xlabel('time [volumes]', fontsize=20)
-ax[1].tick_params(labelsize=12)
-ax[1].tick_params(labelsize=12)
 
 fig.subplots_adjust(wspace=0, hspace=0.5)
 plt.show()
@@ -167,26 +111,16 @@ for x in range(64):
             c = np.corrcoef(predicted_response, real_response)[1:,0]
             if np.abs(c[0]) > 0.2:     
                 img_correlation[x,y,z]=c[0]
+            else:
+                img_correlation[x,y,z]=np.nan
             if np.abs(c[0]) > c_max :
                 c_max=c
                 x_max=x
                 y_max=y
                 z_max=z
 
-print(x_max)
-print(y_max)
-print(z_max)
 # Find the voxel with the highest correlation coefficient
 strongest_correlated = img_data[x_max,y_max,z_max,:]
-
-# Create the plots
-fig, ax = plt.subplots(1,1,figsize=(15, 5))
-ax.plot(strongest_correlated, lw=3)
-ax.plot(design_matrix[1,:], lw=3)
-ax.set_xlim(0, acq_num-1)
-ax.set_xlabel('time [volumes]', fontsize=20)
-ax.tick_params(labelsize=12)
-plt.show()
 
 # Define the min-max scaling function
 def scale(data):
@@ -207,3 +141,14 @@ ax.tick_params(labelsize=12)
 ax.legend()
 plt.show()
 
+# affichage slice par slice des correlations
+for i in range(len(img_data[0][0])):
+    fig, ax = plt.subplots(1,1,figsize=(18, 6))
+    ax.imshow(mean_data[:,:,i], cmap='gray')
+    ax.imshow(img_correlation[:,:,i], cmap='afmhot')
+    ax.set_title('thresholded map (overlay)', fontsize=25)
+    ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    plt.show()
