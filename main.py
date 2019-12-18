@@ -154,6 +154,7 @@ ax[1].tick_params(labelsize=12)
 fig.subplots_adjust(wspace=0, hspace=0.5)
 plt.show()
 
+img_correlation=np.zeros((64,64,50))
 # Calculate the correlation coefficients - for each voxel
 c_max=0
 x_max=0
@@ -164,7 +165,9 @@ for x in range(64):
         for z in range(50):
             real_response=img_data[x,y,z,:]
             c = np.corrcoef(predicted_response, real_response)[1:,0]
-            if len(c)>0 and np.abs(c[0]) > c_max :
+            if np.abs(c[0]) > 0.2:     
+                img_correlation[x,y,z]=c[0]
+            if np.abs(c[0]) > c_max :
                 c_max=c
                 x_max=x
                 y_max=y
@@ -184,3 +187,23 @@ ax.set_xlim(0, acq_num-1)
 ax.set_xlabel('time [volumes]', fontsize=20)
 ax.tick_params(labelsize=12)
 plt.show()
+
+# Define the min-max scaling function
+def scale(data):
+    return (data - data.min()) / (data.max() - data.min())
+
+# Scale the voxel with the highest correlation
+strongest_correlated_scaled = scale(img_data[x_max,y_max,z_max,:])
+
+# Create the plots
+fig, (ax) = plt.subplots(1,1,figsize=(15, 5))
+ax.plot(strongest_correlated_scaled, label='voxel timecourse', lw=3)
+ax.plot(design_matrix[1,:], label='design matrix', lw=3)
+ax.set_xlim(0, acq_num-1)
+ax.set_ylim(-0.25, 1.5)
+ax.set_xlabel('time [volumes]', fontsize=20)
+ax.set_ylabel('scaled response', fontsize=20)
+ax.tick_params(labelsize=12)
+ax.legend()
+plt.show()
+
