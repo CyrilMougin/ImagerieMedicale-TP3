@@ -98,3 +98,12 @@ Data/Thumbs.db
 Data/tensor.png
 Data/ideal.txt
 Data/gradient_directions_b-values.txt
+Data/csa_direction_field.png
+Data/fibre.trk
+Data/gfa_tracking_mask.png
+tuto/csa_direction_field.png
+tuto/gfa_tracking_mask.png
+tuto/restore_dti.py
+tuto/tracking_introduction_eudx.py
+tuto/tractogram_EuDX.png
+tuto/tractogram_EuDX.trk

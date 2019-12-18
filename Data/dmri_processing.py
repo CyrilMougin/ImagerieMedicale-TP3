@@ -6,8 +6,8 @@ import dipy.data as dpd
 import dipy.reconst.dti as dti
 import matplotlib.pyplot as plt
 import math
-from scipy.interpolate import RegularGridInterpolator
 from sklearn.metrics.pairwise import cosine_similarity
+from scipy.ndimage.filters import median_filter
 #
 # LOAD DATA and b-values, b-vectors
 # (nibabel will do this for you for the Nifti)
@@ -123,6 +123,7 @@ def enregistrer_cartes(fa_, adc_) :
     img.set_data_dtype(np.float32)
     nib.save(img, filename="adc.nii")
     
+fa=median_filter(fa, size=2)
 enregistrer_cartes(fa, adc)
 
 #
@@ -133,44 +134,50 @@ enregistrer_cartes(fa, adc)
 # =============================================================================
 # tractographie
 # =============================================================================
-fa_threshold=0.30
+
+
+fa_threshold1=0.80
+fa_threshold2=0.30
 streamlines=nib.streamlines.array_sequence.ArraySequence()
 
 
 #choix mask
-mask=np.zeros(shape=[dmri_data.shape[0], dmri_data.shape[1],dmri_data.shape[2]])
+mask1=np.zeros(shape=[dmri_data.shape[0], dmri_data.shape[1],dmri_data.shape[2]])
+mask2=np.zeros(shape=[dmri_data.shape[0], dmri_data.shape[1],dmri_data.shape[2]])
 for x in range (dmri_data.shape[0]) :
     for y in range (dmri_data.shape[1]) :
         for z in range(dmri_data.shape[2]) :
-            if (fa[x,y,z]>fa_threshold) :
-                mask[x,y,z]=255
+            if (fa[x,y,z]>fa_threshold1) :
+                mask1[x,y,z]=255
+            if (fa[x,y,z]>fa_threshold2) :
+                mask2[x,y,z]=255
                 
 plt.imshow(fa[:,:,30], cmap="gray")
 plt.figure()
-plt.imshow(mask[:,:,30], cmap="gray")
+plt.imshow(mask1[:,:,30], cmap="gray")
 plt.figure()
 plt.imshow(fa[:,63,:], cmap="gray")
 plt.figure()
-plt.imshow(mask[:,63,:], cmap="gray")
+plt.imshow(mask1[:,63,:], cmap="gray")
 plt.figure()
 plt.imshow(fa[63,:,:], cmap="gray")
 plt.figure()
-plt.imshow(mask[63,:,:], cmap="gray")
+plt.imshow(mask1[63,:,:], cmap="gray")
 
 #generation des seeds
-
-seeds=np.empty(shape=(100,3))
+taille=100000
+seeds=np.empty(shape=(taille,3))
 cmpt=0
-while (cmpt<100):
+while (cmpt<taille):
     random_index_x = np.random.randint(0, dmri_data.shape[0])
     random_index_y = np.random.randint(0, dmri_data.shape[1])
     random_index_z = np.random.randint(0, dmri_data.shape[2])
-    if(mask[random_index_x,random_index_y, random_index_z]==255) :#position valide dans le mask    
+    if(mask1[random_index_x,random_index_y, random_index_z]==255) :#position valide dans le mask    
         seeds[cmpt]=[random_index_x,random_index_y, random_index_z]
         cmpt+=1
 
 #tracking
-delta_step=0.5       
+delta_step=0.1       
 
 def get_closest_dir(evec, direction) :
     sim=[]
@@ -210,7 +217,8 @@ def interpolation (dir_prec, coord):
 
 
 streamlines = nib.streamlines.array_sequence.ArraySequence()
-for i in range (100) :
+
+for i in range (taille) :
     print(i)
     l=seeds[i]
     l=np.vstack([l, seeds[i]])
@@ -220,8 +228,8 @@ for i in range (100) :
        
     
     conditions=l[-1][0]<dmri_data.shape[0]-1 and l[-1][1]<dmri_data.shape[1]-1 and l[-1][2]<dmri_data.shape[2]-1
-    #conditions=conditions and mask[l[-1][0],l[-1][1], l[-1][2]]==255
-    conditions= conditions and angle<30
+    conditions=conditions and mask2[l[-1][0],l[-1][1], l[-1][2]]==255
+    conditions= conditions and angle<40
     
     while (conditions):
         x=np.int32(l[-1][0])
@@ -242,13 +250,13 @@ for i in range (100) :
     #    print(l[-1])
     #    print(mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])])
         conditions=l[-1][0]<dmri_data.shape[0]-1 and l[-1][1]<dmri_data.shape[1]-1 and l[-1][2]<dmri_data.shape[2]-1
-        #conditions=conditions and mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])]==255
-        conditions= conditions and angle<30
+        conditions=conditions and mask2[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])]==255
+        conditions= conditions and angle<40
         
     streamlines.append(l)
 
 
-print(streamlines)
+#print(streamlines)
 tractogramme=nib.streamlines.tractogram.Tractogram(streamlines, affine_to_rasmm=np.identity(4))
 file=nib.streamlines.trk.TrkFile(tractogramme)
 file.save("fibre.trk")
