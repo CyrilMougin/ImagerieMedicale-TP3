@@ -107,3 +107,6 @@ tuto/restore_dti.py
 tuto/tracking_introduction_eudx.py
 tuto/tractogram_EuDX.png
 tuto/tractogram_EuDX.trk
+Data/dmri.nii.gz
+Data/fmri.nii.gz
+Data/t1.nii.gz
