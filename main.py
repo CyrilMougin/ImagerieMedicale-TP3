@@ -8,6 +8,7 @@ Created on Fri Dec 13 14:00:18 2019
 import nibabel as nib
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import butter, filtfilt
 
 def load (file_name):
     img = nib.load(file_name)
@@ -56,17 +57,20 @@ img=nib.load('Data/fmri.nii/fmri.nii')
 img_data = img.get_data()
 img_header = img.header
 
-def eliminate_non_brain(img_data):
-    for t in range(0,85):
-        for i in range(len(img_data[0][0])):
-            slice = img_data[:, :, i,t]
-            median = np.median(slice)
-            indexes = slice<=median
-            img_data[:, :, i,t][indexes]=0
-    return img_data
 
-
-img_data = eliminate_non_brain(img_data)
+# =============================================================================
+# def eliminate_non_brain(img_data):
+#     for t in range(0,85):
+#         for i in range(len(img_data[0][0])):
+#             slice = img_data[:, :, i,t]
+#             median = np.median(slice)
+#             indexes = slice<=median
+#             img_data[:, :, i,t][indexes]=0
+#     return img_data
+# 
+# 
+# img_data = eliminate_non_brain(img_data)
+# =============================================================================
 acq_num=85
 
 # Select a random voxel by getting one random x- and y-coorinate
@@ -87,6 +91,19 @@ plt.show()
 # Average all volumes
 mean_data = img_data.mean(axis=3)
 
+# Sample rate and desired cutoff frequencies (in Hz).
+fs = 1000
+lowcut = 0.1
+highcut = 0.3
+
+# Generate the time vector properly
+t = np.linspace(0, 255, 85, endpoint=False)
+
+ # Cut-off frequency of the filter
+w = [lowcut, highcut]
+b, a = butter(13, w, 'bandpass')
+
+
 # Create the design matrix
 constant = np.ones(acq_num)
 with open("Data/ideal.txt") as f:
@@ -104,20 +121,23 @@ c_max=0
 x_max=0
 y_max=0
 z_max=0
-for x in range(64):
-    for y in range(64):
-        for z in range(50):
-            real_response=img_data[x,y,z,:]
-            c = np.corrcoef(predicted_response, real_response)[1:,0]
-            if np.abs(c[0]) > 0.2:     
-                img_correlation[x,y,z]=c[0]
-            else:
-                img_correlation[x,y,z]=np.nan
-            if np.abs(c[0]) > c_max :
-                c_max=c
-                x_max=x
-                y_max=y
-                z_max=z
+
+median = np.median(img_data)
+for z in range(50):
+    for x in range(64):
+        for y in range(64):
+            if np.mean(img_data[x, y, z, :]) > median :
+                real_response=filtfilt(b, a, img_data[x, y, z, :])
+                c = np.corrcoef(predicted_response, real_response)[1:,0]
+                if c[0] > 0.3:     
+                    img_correlation[x,y,z]=c[0]
+                else:
+                    img_correlation[x,y,z]=np.nan
+                if c[0] > c_max :
+                    c_max=c
+                    x_max=x
+                    y_max=y
+                    z_max=z
 
 # Find the voxel with the highest correlation coefficient
 strongest_correlated = img_data[x_max,y_max,z_max,:]
@@ -179,54 +199,59 @@ plt.show()
 
 simulation_period=50
 
-from scipy.signal import butter, lfilter, freqz
+# =============================================================================
+# from scipy.signal import butter, lfilter, freqz
+# 
+# def butter_bandpass(lowcut, highcut, fs, order=5):
+#     nyq = 0.5 * fs
+#     low = lowcut / nyq
+#     high = highcut / nyq
+#     b, a = butter(order, [low, high], btype='band')
+#     return b, a
+# 
+# 
+# def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+#     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+#     y = lfilter(b, a, data)
+#     return y
+# 
+# # Sample rate and desired cutoff frequencies (in Hz).
+# fs = 85
+# lowcut = 0.005
+# highcut = 0.3
+# 
+# # Plot the frequency response for a few different orders.
+# plt.figure(100)
+# plt.clf()
+# for order in [3, 6, 9]:
+#     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+#     w, h = freqz(b, a, worN=2000)
+#     plt.plot((fs * 0.5 / np.pi) * w, abs(h), label="order = %d" % order)
+# 
+# plt.plot([0, 0.5 * fs], [np.sqrt(0.5), np.sqrt(0.5)],
+#          '--', label='sqrt(0.5)')
+# plt.xlabel('Frequency (Hz)')
+# plt.ylabel('Gain')
+# plt.grid(True)
+# plt.legend(loc='best')
+# 
+# # Filter a noisy signal.
+# t = np.linspace(0, 255, 85, endpoint=False)
+# a = 0.02
+# 
+# y = butter_bandpass_filter(img_data[x_max, y_max, z_max, :], lowcut, highcut, fs, order=6)
+# plt.plot(t, y, label='Filtered signal')
+# plt.xlabel('time (seconds)')
+# plt.hlines([-a, a], 0, 255, linestyles='--')
+# plt.grid(True)
+# plt.axis('tight')
+# plt.legend(loc='upper left')
+# 
+# plt.show()
+# =============================================================================
 
-def butter_bandpass(lowcut, highcut, fs, order=5):
-    nyq = 0.5 * fs
-    low = lowcut / nyq
-    high = highcut / nyq
-    b, a = butter(order, [low, high], btype='band')
-    return b, a
-
-
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = lfilter(b, a, data)
-    return y
-
-# Sample rate and desired cutoff frequencies (in Hz).
-fs = 85
-lowcut = 0.005
-highcut = 0.3
-
-# Plot the frequency response for a few different orders.
-plt.figure(100)
-plt.clf()
-for order in [3, 6, 9]:
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    w, h = freqz(b, a, worN=2000)
-    plt.plot((fs * 0.5 / np.pi) * w, abs(h), label="order = %d" % order)
-
-plt.plot([0, 0.5 * fs], [np.sqrt(0.5), np.sqrt(0.5)],
-         '--', label='sqrt(0.5)')
-plt.xlabel('Frequency (Hz)')
-plt.ylabel('Gain')
-plt.grid(True)
-plt.legend(loc='best')
-
-# Filter a noisy signal.
-t = np.linspace(0, 255, 85, endpoint=False)
-a = 0.02
-
-y = butter_bandpass_filter(img_data[x_max, y_max, z_max, :], lowcut, highcut, fs, order=6)
-plt.plot(t, y, label='Filtered signal')
-plt.xlabel('time (seconds)')
-plt.hlines([-a, a], 0, 255, linestyles='--')
-plt.grid(True)
-plt.axis('tight')
-plt.legend(loc='upper left')
-
-plt.show()
-
+img_mask=nib.Nifti1Image(mean_data+img_correlation,affine=img.affine) #header=nii.get_header(), affine=nii.get_affine()
+plot_slice(100,img_mask.get_data()[:, :, 10],"Image source")
+nib.save(img_mask, 'Data/fmri_mask.nii')
 
 
