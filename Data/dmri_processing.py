@@ -8,10 +8,8 @@ import matplotlib.pyplot as plt
 import math
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.ndimage.filters import median_filter
-#
-# LOAD DATA and b-values, b-vectors
-# (nibabel will do this for you for the Nifti)
-# (b-values and b-vectors are text files)
+from tqdm import tqdm
+
 
 dmri = nib.load("dmri.nii",mmap=False)
 
@@ -56,11 +54,8 @@ for x in range (dmri_data.shape[0]) :
                 ensemble_D[x,y,z]=np.array([0, 0, 0, 0, 0, 0])
 
 #enregister les tenseurs
-img = nib.Nifti1Image(ensemble_D, np.eye(4))
+img = nib.Nifti1Image(ensemble_D, None, header=dmri.header)
 img.set_data_dtype(np.float32)
-header_info = img.header
-header_info['pixdim'][1:5]  = dmri.header['pixdim'][1:5]
-x = nib.Nifti1Image(ensemble_D, np.eye(4), header_info)
 nib.save(img, filename="tensors.nii")
 
 
@@ -115,29 +110,25 @@ def afficher_tenseurs(fa_,evec,eva) :
 afficher_tenseurs(fa, evecs,evals)
 
 def enregistrer_cartes(fa_, adc_) :
-    img = nib.Nifti1Image(fa_, np.eye(4))
+    img = nib.Nifti1Image(fa_,  None, header=dmri.header)
     img.set_data_dtype(np.float32)
     nib.save(img, filename="fa.nii")
     
-    img = nib.Nifti1Image(adc_, np.eye(4))
+    img = nib.Nifti1Image(adc_,  None, header=dmri.header)
     img.set_data_dtype(np.float32)
     nib.save(img, filename="adc.nii")
     
 fa=median_filter(fa, size=2)
 enregistrer_cartes(fa, adc)
 
-#
-# Compute tensors and FA/ADC
-#  - tensor fit
-#  - SVD  -> eigen values -> FA/AD
-#
+
 # =============================================================================
 # tractographie
 # =============================================================================
 
 
 fa_threshold1=0.80
-fa_threshold2=0.30
+fa_threshold2=0.40
 streamlines=nib.streamlines.array_sequence.ArraySequence()
 
 
@@ -165,7 +156,7 @@ plt.figure()
 plt.imshow(mask1[63,:,:], cmap="gray")
 
 #generation des seeds
-taille=100000
+taille=100
 seeds=np.empty(shape=(taille,3))
 cmpt=0
 while (cmpt<taille):
@@ -218,8 +209,7 @@ def interpolation (dir_prec, coord):
 
 streamlines = nib.streamlines.array_sequence.ArraySequence()
 
-for i in range (taille) :
-    print(i)
+for i in tqdm(range(taille)) :
     l=seeds[i]
     l=np.vstack([l, seeds[i]])
     l=np.int32(l)
@@ -245,36 +235,23 @@ for i in range (taille) :
         dir_prec=direction_princ
         
         l=np.vstack([l, p])
-        
-    #    print(angle)
-    #    print(l[-1])
-    #    print(mask[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])])
+
         conditions=l[-1][0]<dmri_data.shape[0]-1 and l[-1][1]<dmri_data.shape[1]-1 and l[-1][2]<dmri_data.shape[2]-1
         conditions=conditions and mask2[np.int32(l[-1][0]),np.int32(l[-1][1]), np.int32(l[-1][2])]==255
         conditions= conditions and angle<40
         
     streamlines.append(l)
+   
+    
 
 
 #print(streamlines)
-tractogramme=nib.streamlines.tractogram.Tractogram(streamlines, affine_to_rasmm=np.identity(4))
+tractogramme=nib.streamlines.tractogram.Tractogram(streamlines, affine_to_rasmm=dmri.affine)
 file=nib.streamlines.trk.TrkFile(tractogramme)
 file.save("fibre.trk")
 
     
     
 
-#
-# Tracking deterministe sur la direction principale -> eigen vector1
-#
 
-
-#
-# Save streamlines in a .trk format or .tck format to visualize in MI-Brain
-#
-
-
-#
-# The DIPY gallery should help you a lot:
-#  http://nipy.org/dipy/examples_index.html
 #
