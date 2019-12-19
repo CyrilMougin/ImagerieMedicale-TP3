@@ -163,14 +163,70 @@ plt.legend(['Activation', 'No activation'], loc='best')
 plt.show()
 # Compute fft for a voxel:
 # input signal is 85 long, 2**7 = 128 seems to be enough
-freq_signal1 = np.squeeze(np.fft.fft(signal1, n=2**7))
-freq_signal2 = np.squeeze(np.fft.fft(signal2, n=2**7))
-timestep = 3.864
-freq = np.squeeze(np.fft.fftfreq(2**7, d=timestep))
-plt.plot(freq[:63], np.absolute(freq_signal1[:63]), 'b')
-plt.plot(freq[:63], np.absolute(freq_signal2[:63]), 'r')
+fft1=np.fft.fft(signal1, n=85)
+fft2=np.fft.fft(signal2, n=85)
+freq_signal1 = np.squeeze(fft1)
+freq_signal2 = np.squeeze(fft2)
+timestep = 3
+freq = np.squeeze(np.fft.fftfreq(85, d=timestep))
+plt.plot(freq[:42], np.absolute(freq_signal1[:42]), 'b')
+plt.plot(freq[:42], np.absolute(freq_signal2[:42]), 'r')
 plt.xlim((0, 0.13))
-plt.ylim((-100, 500))
+plt.ylim((-100, 1000))
 plt.legend(['Activation', 'No activation'], loc='best')
-plt.xticks(np.arange(0, max(freq[:63]), 0.02))
+plt.xticks(np.arange(0, max(freq[:85]), 0.02))
 plt.show()
+
+simulation_period=50
+
+from scipy.signal import butter, lfilter, freqz
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
+# Sample rate and desired cutoff frequencies (in Hz).
+fs = 85
+lowcut = 0.005
+highcut = 0.3
+
+# Plot the frequency response for a few different orders.
+plt.figure(100)
+plt.clf()
+for order in [3, 6, 9]:
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    w, h = freqz(b, a, worN=2000)
+    plt.plot((fs * 0.5 / np.pi) * w, abs(h), label="order = %d" % order)
+
+plt.plot([0, 0.5 * fs], [np.sqrt(0.5), np.sqrt(0.5)],
+         '--', label='sqrt(0.5)')
+plt.xlabel('Frequency (Hz)')
+plt.ylabel('Gain')
+plt.grid(True)
+plt.legend(loc='best')
+
+# Filter a noisy signal.
+t = np.linspace(0, 255, 85, endpoint=False)
+a = 0.02
+
+y = butter_bandpass_filter(img_data[x_max, y_max, z_max, :], lowcut, highcut, fs, order=6)
+plt.plot(t, y, label='Filtered signal')
+plt.xlabel('time (seconds)')
+plt.hlines([-a, a], 0, 255, linestyles='--')
+plt.grid(True)
+plt.axis('tight')
+plt.legend(loc='upper left')
+
+plt.show()
+
+
+
