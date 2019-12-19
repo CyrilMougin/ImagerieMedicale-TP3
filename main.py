@@ -9,6 +9,7 @@ import nibabel as nib
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import butter, filtfilt
+from scipy.ndimage.filters import gaussian_filter
 
 def load (file_name):
     img = nib.load(file_name)
@@ -46,31 +47,10 @@ def plot_slice(i,slice,subtitle=""):
     plt.show
     plt.suptitle(subtitle)
 
-# =============================================================================
-# data= load('Data/fmri.nii/fmri.nii')
-# np_imgs = view4D('Data/fmri.nii/fmri.nii','transversal', False)
-# np_img = np_imgs[0]
-# plot_slice(1,np_img,"Image source")
-# =============================================================================
-
-img=nib.load('Data/fmri.nii/fmri.nii')
+img=nib.load('Data/fmri.nii')
 img_data = img.get_data()
 img_header = img.header
 
-
-# =============================================================================
-# def eliminate_non_brain(img_data):
-#     for t in range(0,85):
-#         for i in range(len(img_data[0][0])):
-#             slice = img_data[:, :, i,t]
-#             median = np.median(slice)
-#             indexes = slice<=median
-#             img_data[:, :, i,t][indexes]=0
-#     return img_data
-# 
-# 
-# img_data = eliminate_non_brain(img_data)
-# =============================================================================
 acq_num=85
 
 # Select a random voxel by getting one random x- and y-coorinate
@@ -129,7 +109,7 @@ for z in range(50):
             if np.mean(img_data[x, y, z, :]) > median :
                 real_response=filtfilt(b, a, img_data[x, y, z, :])
                 c = np.corrcoef(predicted_response, real_response)[1:,0]
-                if c[0] > 0.3:     
+                if c[0] > 0.45:     
                     img_correlation[x,y,z]=c[0]
                 else:
                     img_correlation[x,y,z]=np.nan
@@ -199,58 +179,9 @@ plt.show()
 
 simulation_period=50
 
-# =============================================================================
-# from scipy.signal import butter, lfilter, freqz
-# 
-# def butter_bandpass(lowcut, highcut, fs, order=5):
-#     nyq = 0.5 * fs
-#     low = lowcut / nyq
-#     high = highcut / nyq
-#     b, a = butter(order, [low, high], btype='band')
-#     return b, a
-# 
-# 
-# def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-#     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-#     y = lfilter(b, a, data)
-#     return y
-# 
-# # Sample rate and desired cutoff frequencies (in Hz).
-# fs = 85
-# lowcut = 0.005
-# highcut = 0.3
-# 
-# # Plot the frequency response for a few different orders.
-# plt.figure(100)
-# plt.clf()
-# for order in [3, 6, 9]:
-#     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-#     w, h = freqz(b, a, worN=2000)
-#     plt.plot((fs * 0.5 / np.pi) * w, abs(h), label="order = %d" % order)
-# 
-# plt.plot([0, 0.5 * fs], [np.sqrt(0.5), np.sqrt(0.5)],
-#          '--', label='sqrt(0.5)')
-# plt.xlabel('Frequency (Hz)')
-# plt.ylabel('Gain')
-# plt.grid(True)
-# plt.legend(loc='best')
-# 
-# # Filter a noisy signal.
-# t = np.linspace(0, 255, 85, endpoint=False)
-# a = 0.02
-# 
-# y = butter_bandpass_filter(img_data[x_max, y_max, z_max, :], lowcut, highcut, fs, order=6)
-# plt.plot(t, y, label='Filtered signal')
-# plt.xlabel('time (seconds)')
-# plt.hlines([-a, a], 0, 255, linestyles='--')
-# plt.grid(True)
-# plt.axis('tight')
-# plt.legend(loc='upper left')
-# 
-# plt.show()
-# =============================================================================
-
-img_mask=nib.Nifti1Image(mean_data+img_correlation,affine=img.affine) #header=nii.get_header(), affine=nii.get_affine()
+#array_processed = gaussian_filter(mean_data+img_correlation,0.12)
+array_processed = img_correlation
+img_mask=nib.Nifti1Image(array_processed,affine=img.affine)
 plot_slice(100,img_mask.get_data()[:, :, 10],"Image source")
 nib.save(img_mask, 'Data/fmri_mask.nii')
 
