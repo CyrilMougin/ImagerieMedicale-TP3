@@ -8,8 +8,9 @@ Created on Fri Dec 13 14:00:18 2019
 import nibabel as nib
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import butter, filtfilt
-from scipy.ndimage.filters import gaussian_filter
+from scipy.signal import butter, filtfilt, medfilt
+from scipy.ndimage import gaussian_filter
+from sklearn.cluster import MeanShift,estimate_bandwidth
 
 def load (file_name):
     img = nib.load(file_name)
@@ -109,10 +110,10 @@ for z in range(50):
             if np.mean(img_data[x, y, z, :]) > median :
                 real_response=filtfilt(b, a, img_data[x, y, z, :])
                 c = np.corrcoef(predicted_response, real_response)[1:,0]
-                if c[0] > 0.45:     
+                if c[0] > 0.35:     
                     img_correlation[x,y,z]=c[0]
                 else:
-                    img_correlation[x,y,z]=np.nan
+                    img_correlation[x,y,z]=0
                 if c[0] > c_max :
                     c_max=c
                     x_max=x
@@ -141,45 +142,23 @@ ax.tick_params(labelsize=12)
 ax.legend()
 plt.show()
 
+#img_correlation=medfilt(img_correlation,kernel_size=2)
+img_correlation=gaussian_filter(img_correlation, sigma=1)
+mask=img_correlation<0.15
+img_correlation[mask]=0
 # affichage slice par slice des correlations
 for i in range(len(img_data[0][0])):
     fig, ax = plt.subplots(1,1,figsize=(18, 6))
-    ax.imshow(mean_data[:,:,i], cmap='gray')
+    #ax.imshow(mean_data[:,:,i], cmap='gray')
     ax.imshow(img_correlation[:,:,i], cmap='afmhot')
     ax.set_title('thresholded map (overlay)', fontsize=25)
     ax.set_yticks([])
     ax.set_xticks([])
     ax.set_yticks([])
-    
     plt.show()
-    
-# Look at activation for 2 different voxels:
-signal1 = img_data[x_max, y_max, z_max, :]
-signal2 = img_data[0, 0, 0, :]
-time = np.arange(0, 340, 4)
-plt.plot(time, signal1, 'b')
-plt.plot(time, signal2, 'r')
-plt.legend(['Activation', 'No activation'], loc='best')
-plt.show()
-# Compute fft for a voxel:
-# input signal is 85 long, 2**7 = 128 seems to be enough
-fft1=np.fft.fft(signal1, n=85)
-fft2=np.fft.fft(signal2, n=85)
-freq_signal1 = np.squeeze(fft1)
-freq_signal2 = np.squeeze(fft2)
-timestep = 3
-freq = np.squeeze(np.fft.fftfreq(85, d=timestep))
-plt.plot(freq[:42], np.absolute(freq_signal1[:42]), 'b')
-plt.plot(freq[:42], np.absolute(freq_signal2[:42]), 'r')
-plt.xlim((0, 0.13))
-plt.ylim((-100, 1000))
-plt.legend(['Activation', 'No activation'], loc='best')
-plt.xticks(np.arange(0, max(freq[:85]), 0.02))
-plt.show()
 
 simulation_period=50
 
-#array_processed = gaussian_filter(mean_data+img_correlation,0.12)
 array_processed = img_correlation
 img_mask=nib.Nifti1Image(array_processed,affine=img.affine)
 plot_slice(100,img_mask.get_data()[:, :, 10],"Image source")
