@@ -134,22 +134,7 @@ ax.set_yticks([])
 ax.set_xticks([])
 ax.set_yticks([])   
 plt.show()
-# =============================================================================
-# 
-# mask=img_correlation==0 
-# img_correlation[mask]= np.nan
-# # affichage slice par slice des correlations
-# for i in range(len(img_data[0][0])):
-#     fig, ax = plt.subplots(1,1,figsize=(18, 6))
-#     ax.imshow(mean_data[:,:,i], cmap='gray')
-#     ax.imshow(img_correlation[:,:,i], cmap='afmhot')
-#     ax.set_title('Slice segmented', fontsize=25)
-#     ax.set_yticks([])
-#     ax.set_xticks([])
-#     ax.set_yticks([])   
-#     plt.show()
-#     
-# =============================================================================
+
 simulation_period=50
 
 

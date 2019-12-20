@@ -11,14 +11,14 @@ from scipy.ndimage.filters import median_filter
 from tqdm import tqdm
 
 
-dmri = nib.load("dmri.nii",mmap=False)
+dmri = nib.load("Data/dmri.nii",mmap=False)
 
 dmri_data =dmri.get_data()
 
 # =============================================================================
 # estimation des tenseurs
 # =============================================================================
-b=np.loadtxt(fname = "gradient_directions_b-values.txt")
+b=np.loadtxt(fname = "Data/gradient_directions_b-values.txt")
 
 b_vectors=b[1:,0:3]
 b_value=b[1,3]
