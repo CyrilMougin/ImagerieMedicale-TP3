@@ -8,69 +8,14 @@ Created on Fri Dec 13 14:00:18 2019
 import nibabel as nib
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, filtfilt, medfilt
+from scipy.ndimage import gaussian_filter
+from sklearn.cluster import KMeans
 
-def load (file_name):
-    img = nib.load(file_name)
-    img_data = img.get_data()
-    return img_data
-    
-def view4D(img_data,axe,b_plot=False,time=False):
-    img_processed = []
-    if not time :
-        time = round(len(img_data[0][0][0])/2)
-    if axe =='transversal':
-        for i in range(len(img_data[0][0])):
-            slice = img_data[:, :, i,time]
-            img_processed.append(slice)
-            if b_plot : 
-                plot_slice(i,slice)
-    elif axe =='coronal' or axe=='frontal':
-        for i in range(len(img_data[0])):
-            slice = img_data[:, i, :,time]
-            img_processed.append(slice)
-            if b_plot : 
-                plot_slice(i,slice)
-    elif axe =='sagital' or axe=='median':
-        for i in range(len(img_data)):
-            slice = img_data[i, :, :,time]
-            img_processed.append(slice)
-            if b_plot : 
-                plot_slice(i,slice)
-                
-    return img_processed
-
-def plot_slice(i,slice,subtitle=""):
-    plt.figure(i)
-    plt.imshow(slice.T, cmap="gray", origin="lower")
-    plt.show
-    plt.suptitle(subtitle)
-
-# =============================================================================
-# data= load('Data/fmri.nii/fmri.nii')
-# np_imgs = view4D('Data/fmri.nii/fmri.nii','transversal', False)
-# np_img = np_imgs[0]
-# plot_slice(1,np_img,"Image source")
-# =============================================================================
-
-img=nib.load('Data/fmri.nii/fmri.nii')
+img=nib.load('Data/fmri.nii')
 img_data = img.get_data()
 img_header = img.header
 
-
-# =============================================================================
-# def eliminate_non_brain(img_data):
-#     for t in range(0,85):
-#         for i in range(len(img_data[0][0])):
-#             slice = img_data[:, :, i,t]
-#             median = np.median(slice)
-#             indexes = slice<=median
-#             img_data[:, :, i,t][indexes]=0
-#     return img_data
-# 
-# 
-# img_data = eliminate_non_brain(img_data)
-# =============================================================================
 acq_num=85
 
 # Select a random voxel by getting one random x- and y-coorinate
@@ -84,7 +29,7 @@ ax.plot(img_data[x_voxel, y_voxel,z_voxel,:], lw=3)
 ax.set_xlim(0, acq_num-1)
 ax.set_xlabel('time [volumes]', fontsize=20)
 ax.set_ylabel('signal strength', fontsize=20)
-ax.set_title("Courbe d'intensité d'un voxel aléatoire", fontsize=25)
+ax.set_title("Intensity of a random voxel", fontsize=25)
 ax.tick_params(labelsize=12)
 plt.show()
 
@@ -129,10 +74,10 @@ for z in range(50):
             if np.mean(img_data[x, y, z, :]) > median :
                 real_response=filtfilt(b, a, img_data[x, y, z, :])
                 c = np.corrcoef(predicted_response, real_response)[1:,0]
-                if c[0] > 0.3:     
+                if c[0] > 0.35:     
                     img_correlation[x,y,z]=c[0]
                 else:
-                    img_correlation[x,y,z]=np.nan
+                    img_correlation[x,y,z]=0
                 if c[0] > c_max :
                     c_max=c
                     x_max=x
@@ -161,97 +106,55 @@ ax.tick_params(labelsize=12)
 ax.legend()
 plt.show()
 
-# affichage slice par slice des correlations
-for i in range(len(img_data[0][0])):
-    fig, ax = plt.subplots(1,1,figsize=(18, 6))
-    ax.imshow(mean_data[:,:,i], cmap='gray')
-    ax.imshow(img_correlation[:,:,i], cmap='afmhot')
-    ax.set_title('thresholded map (overlay)', fontsize=25)
-    ax.set_yticks([])
-    ax.set_xticks([])
-    ax.set_yticks([])
-    
-    plt.show()
-    
-# Look at activation for 2 different voxels:
-signal1 = img_data[x_max, y_max, z_max, :]
-signal2 = img_data[0, 0, 0, :]
-time = np.arange(0, 340, 4)
-plt.plot(time, signal1, 'b')
-plt.plot(time, signal2, 'r')
-plt.legend(['Activation', 'No activation'], loc='best')
-plt.show()
-# Compute fft for a voxel:
-# input signal is 85 long, 2**7 = 128 seems to be enough
-fft1=np.fft.fft(signal1, n=85)
-fft2=np.fft.fft(signal2, n=85)
-freq_signal1 = np.squeeze(fft1)
-freq_signal2 = np.squeeze(fft2)
-timestep = 3
-freq = np.squeeze(np.fft.fftfreq(85, d=timestep))
-plt.plot(freq[:42], np.absolute(freq_signal1[:42]), 'b')
-plt.plot(freq[:42], np.absolute(freq_signal2[:42]), 'r')
-plt.xlim((0, 0.13))
-plt.ylim((-100, 1000))
-plt.legend(['Activation', 'No activation'], loc='best')
-plt.xticks(np.arange(0, max(freq[:85]), 0.02))
-plt.show()
+#img_correlation=medfilt(img_correlation,kernel_size=2)
+img_correlation=gaussian_filter(img_correlation, sigma=1)
+mask=img_correlation>0.15
 
+l=list()
+for z in range(50):
+    for x in range(64):
+        for y in range(64):
+            if mask[x,y,z]:
+                l.append(np.array([x,y,z]))
+            else:
+                img_correlation[x,y,z]=0
+               
+nb_cluster=15
+kmeans = KMeans(n_clusters=nb_cluster, max_iter=600, random_state=0, algorithm="full").fit(np.array(l))
+
+for index,element in enumerate(l):
+    img_correlation[element[0],element[1],element[2]]=kmeans.labels_[index]*10+100
+
+projection=np.amax(img_correlation,axis=2)
+fig, ax = plt.subplots(1,1,figsize=(18, 6))
+ax.imshow(mean_data[:,:,20], cmap='gray')
+ax.imshow(projection, cmap='jet')
+ax.set_title('Projection 2D', fontsize=25)
+ax.set_yticks([])
+ax.set_xticks([])
+ax.set_yticks([])   
+plt.show()
+# =============================================================================
+# 
+# mask=img_correlation==0 
+# img_correlation[mask]= np.nan
+# # affichage slice par slice des correlations
+# for i in range(len(img_data[0][0])):
+#     fig, ax = plt.subplots(1,1,figsize=(18, 6))
+#     ax.imshow(mean_data[:,:,i], cmap='gray')
+#     ax.imshow(img_correlation[:,:,i], cmap='afmhot')
+#     ax.set_title('Slice segmented', fontsize=25)
+#     ax.set_yticks([])
+#     ax.set_xticks([])
+#     ax.set_yticks([])   
+#     plt.show()
+#     
+# =============================================================================
 simulation_period=50
 
-# =============================================================================
-# from scipy.signal import butter, lfilter, freqz
-# 
-# def butter_bandpass(lowcut, highcut, fs, order=5):
-#     nyq = 0.5 * fs
-#     low = lowcut / nyq
-#     high = highcut / nyq
-#     b, a = butter(order, [low, high], btype='band')
-#     return b, a
-# 
-# 
-# def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-#     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-#     y = lfilter(b, a, data)
-#     return y
-# 
-# # Sample rate and desired cutoff frequencies (in Hz).
-# fs = 85
-# lowcut = 0.005
-# highcut = 0.3
-# 
-# # Plot the frequency response for a few different orders.
-# plt.figure(100)
-# plt.clf()
-# for order in [3, 6, 9]:
-#     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-#     w, h = freqz(b, a, worN=2000)
-#     plt.plot((fs * 0.5 / np.pi) * w, abs(h), label="order = %d" % order)
-# 
-# plt.plot([0, 0.5 * fs], [np.sqrt(0.5), np.sqrt(0.5)],
-#          '--', label='sqrt(0.5)')
-# plt.xlabel('Frequency (Hz)')
-# plt.ylabel('Gain')
-# plt.grid(True)
-# plt.legend(loc='best')
-# 
-# # Filter a noisy signal.
-# t = np.linspace(0, 255, 85, endpoint=False)
-# a = 0.02
-# 
-# y = butter_bandpass_filter(img_data[x_max, y_max, z_max, :], lowcut, highcut, fs, order=6)
-# plt.plot(t, y, label='Filtered signal')
-# plt.xlabel('time (seconds)')
-# plt.hlines([-a, a], 0, 255, linestyles='--')
-# plt.grid(True)
-# plt.axis('tight')
-# plt.legend(loc='upper left')
-# 
-# plt.show()
-# =============================================================================
 
-img_mask=nib.Nifti1Image(mean_data+img_correlation,affine=img.affine) #header=nii.get_header(), affine=nii.get_affine()
-plot_slice(100,img_mask.get_data()[:, :, 10],"Image source")
+array_processed = img_correlation
+img_mask=nib.Nifti1Image(array_processed,affine=img.affine)
 nib.save(img_mask, 'Data/fmri_mask.nii')
 
 
