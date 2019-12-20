@@ -10,43 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import butter, filtfilt, medfilt
 from scipy.ndimage import gaussian_filter
-from sklearn.cluster import MeanShift,estimate_bandwidth
-
-def load (file_name):
-    img = nib.load(file_name)
-    img_data = img.get_data()
-    return img_data
-    
-def view4D(img_data,axe,b_plot=False,time=False):
-    img_processed = []
-    if not time :
-        time = round(len(img_data[0][0][0])/2)
-    if axe =='transversal':
-        for i in range(len(img_data[0][0])):
-            slice = img_data[:, :, i,time]
-            img_processed.append(slice)
-            if b_plot : 
-                plot_slice(i,slice)
-    elif axe =='coronal' or axe=='frontal':
-        for i in range(len(img_data[0])):
-            slice = img_data[:, i, :,time]
-            img_processed.append(slice)
-            if b_plot : 
-                plot_slice(i,slice)
-    elif axe =='sagital' or axe=='median':
-        for i in range(len(img_data)):
-            slice = img_data[i, :, :,time]
-            img_processed.append(slice)
-            if b_plot : 
-                plot_slice(i,slice)
-                
-    return img_processed
-
-def plot_slice(i,slice,subtitle=""):
-    plt.figure(i)
-    plt.imshow(slice.T, cmap="gray", origin="lower")
-    plt.show
-    plt.suptitle(subtitle)
+from sklearn.cluster import KMeans
 
 img=nib.load('Data/fmri.nii')
 img_data = img.get_data()
@@ -65,7 +29,7 @@ ax.plot(img_data[x_voxel, y_voxel,z_voxel,:], lw=3)
 ax.set_xlim(0, acq_num-1)
 ax.set_xlabel('time [volumes]', fontsize=20)
 ax.set_ylabel('signal strength', fontsize=20)
-ax.set_title("Courbe d'intensité d'un voxel aléatoire", fontsize=25)
+ax.set_title("Intensity of a random voxel", fontsize=25)
 ax.tick_params(labelsize=12)
 plt.show()
 
@@ -144,24 +108,38 @@ plt.show()
 
 #img_correlation=medfilt(img_correlation,kernel_size=2)
 img_correlation=gaussian_filter(img_correlation, sigma=1)
-mask=img_correlation<0.15
-img_correlation[mask]=0
+mask=img_correlation>0.15
+
+l=list()
+for z in range(50):
+    for x in range(64):
+        for y in range(64):
+            if mask[x,y,z]:
+                l.append(np.array([x,y,z]))
+            else:
+                img_correlation[x,y,z]=0
+               
+nb_cluster=15
+kmeans = KMeans(n_clusters=nb_cluster, max_iter=600, random_state=0, algorithm="full").fit(np.array(l))
+
+for index,element in enumerate(l):
+    img_correlation[element[0],element[1],element[2]]=kmeans.labels_[index]*10+100
+    
 # affichage slice par slice des correlations
 for i in range(len(img_data[0][0])):
     fig, ax = plt.subplots(1,1,figsize=(18, 6))
-    #ax.imshow(mean_data[:,:,i], cmap='gray')
+    ax.imshow(mean_data[:,:,i], cmap='gray')
     ax.imshow(img_correlation[:,:,i], cmap='afmhot')
     ax.set_title('thresholded map (overlay)', fontsize=25)
     ax.set_yticks([])
     ax.set_xticks([])
     ax.set_yticks([])
     plt.show()
-
+    
 simulation_period=50
 
 array_processed = img_correlation
 img_mask=nib.Nifti1Image(array_processed,affine=img.affine)
-plot_slice(100,img_mask.get_data()[:, :, 10],"Image source")
 nib.save(img_mask, 'Data/fmri_mask.nii')
 
 
