@@ -124,19 +124,34 @@ kmeans = KMeans(n_clusters=nb_cluster, max_iter=600, random_state=0, algorithm="
 
 for index,element in enumerate(l):
     img_correlation[element[0],element[1],element[2]]=kmeans.labels_[index]*10+100
-    
-# affichage slice par slice des correlations
-for i in range(len(img_data[0][0])):
-    fig, ax = plt.subplots(1,1,figsize=(18, 6))
-    ax.imshow(mean_data[:,:,i], cmap='gray')
-    ax.imshow(img_correlation[:,:,i], cmap='afmhot')
-    ax.set_title('thresholded map (overlay)', fontsize=25)
-    ax.set_yticks([])
-    ax.set_xticks([])
-    ax.set_yticks([])
-    plt.show()
-    
+
+projection=np.amax(img_correlation,axis=2)
+fig, ax = plt.subplots(1,1,figsize=(18, 6))
+ax.imshow(mean_data[:,:,20], cmap='gray')
+ax.imshow(projection, cmap='jet')
+ax.set_title('Projection 2D', fontsize=25)
+ax.set_yticks([])
+ax.set_xticks([])
+ax.set_yticks([])   
+plt.show()
+# =============================================================================
+# 
+# mask=img_correlation==0 
+# img_correlation[mask]= np.nan
+# # affichage slice par slice des correlations
+# for i in range(len(img_data[0][0])):
+#     fig, ax = plt.subplots(1,1,figsize=(18, 6))
+#     ax.imshow(mean_data[:,:,i], cmap='gray')
+#     ax.imshow(img_correlation[:,:,i], cmap='afmhot')
+#     ax.set_title('Slice segmented', fontsize=25)
+#     ax.set_yticks([])
+#     ax.set_xticks([])
+#     ax.set_yticks([])   
+#     plt.show()
+#     
+# =============================================================================
 simulation_period=50
+
 
 array_processed = img_correlation
 img_mask=nib.Nifti1Image(array_processed,affine=img.affine)
